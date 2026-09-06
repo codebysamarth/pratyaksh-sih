@@ -92,12 +92,19 @@ export const RadarMap: React.FC<RadarMapProps> = ({
       }
 
       // 2. Plot Predicted Candidate ATMs with Clean Vector Radar Rings
-      atms.forEach((atm) => {
-        const isRank1 = atm.rank === 1;
-        const isRank2 = atm.rank === 2;
+      atms.forEach((atm, index) => {
+        const rank = atm.rank ?? index + 1;
+        const isRank1 = rank === 1;
+        const isRank2 = rank === 2;
 
         const mainColor = isRank1 ? "#E11D48" : isRank2 ? "#D97706" : "#475569";
         const pulseBg = isRank1 ? "rgba(225, 29, 72, 0.15)" : isRank2 ? "rgba(217, 119, 6, 0.12)" : "transparent";
+
+        const riskVal = atm.riskScore ?? Math.round(atm.risk_score <= 1 ? atm.risk_score * 100 : atm.risk_score);
+        const etaVal = atm.etaMinutes ?? atm.est_eta_mins ?? 15;
+        const distVal = atm.distanceMeters ?? Math.round((atm.distance_km || 0.8) * 1000);
+        const kioskVal = atm.kioskType ?? (atm.is_standalone_kiosk ? "24/7 Standalone Kiosk" : "Bank Branch ATM");
+        const atmLng = atm.lng ?? atm.lon;
 
         const atmIcon = L.divIcon({
           className: "custom-atm-marker",
@@ -112,12 +119,12 @@ export const RadarMap: React.FC<RadarMapProps> = ({
 
               <!-- Crisp Minimalist Vector Badge -->
               <div class="relative flex items-center justify-center w-7 h-7 rounded-md bg-white border-2 font-mono text-xs font-bold shadow-md" style="border-color:${mainColor}; color:${mainColor};">
-                #${atm.rank}
+                #${rank}
               </div>
 
               <!-- High-Contrast Tag -->
               <div class="absolute -bottom-5 whitespace-nowrap px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-white border shadow-sm" style="border-color:${mainColor}; color:${mainColor};">
-                ${atm.riskScore}% RISK &bull; ${atm.etaMinutes}m
+                ${riskVal}% RISK &bull; ${etaVal}m
               </div>
             </div>
           `,
@@ -125,7 +132,7 @@ export const RadarMap: React.FC<RadarMapProps> = ({
           iconAnchor: [14, 14],
         });
 
-        const marker = L.marker([atm.lat, atm.lng], { icon: atmIcon }).addTo(layerGroup);
+        const marker = L.marker([atm.lat, atmLng], { icon: atmIcon }).addTo(layerGroup);
 
         marker.on("click", () => {
           onSelectAtm(atm);
@@ -135,26 +142,27 @@ export const RadarMap: React.FC<RadarMapProps> = ({
           <div style="padding:12px; font-family:sans-serif; min-width:210px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
               <span style="font-size:10px; font-weight:700; background:${mainColor}18; color:${mainColor}; padding:2px 6px; border-radius:4px; font-family:monospace;">
-                RANK #${atm.rank} HOTSPOT
+                RANK #${rank} HOTSPOT
               </span>
               <span style="font-size:11px; font-weight:700; color:${mainColor}; font-family:monospace;">
-                ${atm.riskScore}% RISK
+                ${riskVal}% RISK
               </span>
             </div>
             <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:2px;">${atm.name}</div>
-            <div style="font-size:11px; color:#64748B; margin-bottom:8px;">${atm.kioskType}</div>
+            <div style="font-size:11px; color:#64748B; margin-bottom:8px;">${kioskVal}</div>
             <div style="display:flex; justify-content:space-between; font-size:11px; color:#334155; border-top:1px solid #F1F5F9; padding-top:6px; font-family:monospace;">
-              <span>ETA: <b>${atm.etaMinutes} mins</b></span>
-              <span>Dist: <b>${atm.distanceMeters}m</b></span>
+              <span>ETA: <b>${etaVal} mins</b></span>
+              <span>Dist: <b>${distVal}m</b></span>
             </div>
           </div>
         `);
       });
 
       // 3. Draw Clean Cobalt Polyline Corridor
-      const rank1 = atms.find((a) => a.rank === 1);
+      const rank1 = atms.find((a, idx) => (a.rank ?? idx + 1) === 1) || atms[0];
       if (muleLocation && rank1) {
-        L.polyline([muleLocation, [rank1.lat, rank1.lng]], {
+        const rank1Lng = rank1.lng ?? rank1.lon;
+        L.polyline([muleLocation, [rank1.lat, rank1Lng]], {
           color: "#2563EB",
           weight: 2.5,
           dashArray: "5, 6",

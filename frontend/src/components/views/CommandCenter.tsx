@@ -287,7 +287,10 @@ export const CommandCenter: React.FC = () => {
               atms={activeCase.atms}
               selectedAtm={selectedAtm}
               onSelectAtm={setSelectedAtm}
-              muleLocation={[activeCase.lastMuleIpLat, activeCase.lastMuleIpLng]}
+              muleLocation={[
+                activeCase.lastMuleIpLat ?? activeCase.center_lat,
+                activeCase.lastMuleIpLng ?? activeCase.center_lon,
+              ]}
             />
           </div>
         </div>
@@ -303,7 +306,7 @@ export const CommandCenter: React.FC = () => {
             </div>
 
             {/* Countdown Micro-Bar Widget */}
-            <CountdownTimer initialSeconds={activeCase.secondsRemaining} />
+            <CountdownTimer initialSeconds={activeCase.secondsRemaining ?? 2340} />
 
             {/* ATM Surveillance Thumbnail Mockup Card */}
             <div className="rounded-lg bg-slate-50 border border-slate-200 overflow-hidden flex flex-col">

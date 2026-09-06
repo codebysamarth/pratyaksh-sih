@@ -4,12 +4,12 @@ import React, { useState, useEffect } from "react";
 import { Clock, AlertTriangle } from "lucide-react";
 
 interface CountdownTimerProps {
-  initialSeconds: number;
+  initialSeconds?: number;
   onExpire?: () => void;
 }
 
 export const CountdownTimer: React.FC<CountdownTimerProps> = ({
-  initialSeconds,
+  initialSeconds = 2340,
   onExpire,
 }) => {
   const [seconds, setSeconds] = useState(initialSeconds);
