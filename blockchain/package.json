@@ -1,0 +1,27 @@
+{
+  "name": "pratyaksh-blockchain",
+  "version": "1.0.0",
+  "description": "PRATYAKSH SIH26184 — Consortium Blockchain Ledger & Smart Contract Layer (Dev 3)",
+  "main": "hardhat.config.js",
+  "scripts": {
+    "node": "npx hardhat node",
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js --network localhost",
+    "test": "npx hardhat test",
+    "test:verbose": "npx hardhat test --verbose"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.4"
+  },
+  "keywords": [
+    "blockchain",
+    "cybercrime",
+    "smart-contracts",
+    "i4c",
+    "pratyaksh",
+    "SIH26184"
+  ],
+  "author": "Dev 3 — PRATYAKSH Team",
+  "license": "MIT"
+}

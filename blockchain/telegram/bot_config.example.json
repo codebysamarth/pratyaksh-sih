@@ -1,0 +1,8 @@
+{
+  "BOT_TOKEN": "YOUR_TELEGRAM_BOT_TOKEN",
+  "_BOT_TOKEN_INSTRUCTIONS": "Create a bot via @BotFather on Telegram. Type /newbot and copy the token here.",
+  "CHAT_ID": "YOUR_CHAT_ID",
+  "_CHAT_ID_INSTRUCTIONS": "Message @userinfobot on Telegram to get your Chat ID.",
+  "BRIDGE_URL": "http://127.0.0.1:8001",
+  "DEFAULT_UNIT_ID": "PCR_VAN_18"
+}

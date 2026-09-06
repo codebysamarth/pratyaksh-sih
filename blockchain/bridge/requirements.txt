@@ -1,0 +1,23 @@
+# PRATYAKSH SIH26184 — Dev 3 Python Dependencies
+# Web3 Bridge (bridge_server.py) + Telegram Field Patrol Bot (field_patrol_bot.py)
+#
+# Install: pip install -r requirements.txt
+# Or with uv: uv pip install -r requirements.txt
+
+# ── Web3 / Blockchain ──────────────────────────────────────────────────────
+web3==6.20.3
+
+# ── FastAPI + ASGI ─────────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+
+# ── Telegram Bot SDK ───────────────────────────────────────────────────────
+python-telegram-bot==21.5
+
+# ── HTTP Client (used by Telegram bot to call bridge endpoints) ────────────
+httpx==0.27.2
+requests==2.32.3
+
+# ── Utilities ──────────────────────────────────────────────────────────────
+python-dotenv==1.0.1

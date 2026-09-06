@@ -46,3 +46,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Credentials / Secrets
+blockchain/telegram/bot_config.json
