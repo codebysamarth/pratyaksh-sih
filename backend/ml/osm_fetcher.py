@@ -10,53 +10,68 @@ DEFAULT_LAT = 18.4636
 DEFAULT_LON = 73.8682
 
 
+OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+
+# Cache to store fetched coordinates so repeated queries are instant
+_ATM_CACHE: Dict[str, List[Dict]] = {}
+
+
 def fetch_real_atms_osm(lat: float = DEFAULT_LAT, lon: float = DEFAULT_LON, radius: int = 2500) -> List[Dict]:
     """
     Queries OpenStreetMap Overpass API for real ATMs within radius meters of lat/lon.
     Falls back to high-quality realistic fallback ATMs if Overpass API is slow/offline.
     """
-    overpass_url = "https://overpass-api.de/api/interpreter"
+    cache_key = f"{round(lat, 3)}_{round(lon, 3)}_{radius}"
+    if cache_key in _ATM_CACHE:
+        return _ATM_CACHE[cache_key]
+
     query = f"""
-    [out:json][timeout:10];
+    [out:json][timeout:5];
     (
       node["amenity"="atm"](around:{radius},{lat},{lon});
       node["amenity"="bank"]["atm"="yes"](around:{radius},{lat},{lon});
     );
     out body;
     """
-    try:
-        response = requests.get(overpass_url, params={"data": query}, timeout=3)
-        if response.status_code == 200:
-            data = response.json()
-            atms = []
-            for elem in data.get("elements", []):
-                tags = elem.get("tags", {})
-                name = (
-                    tags.get("name")
-                    or tags.get("operator")
-                    or f"{tags.get('brand', 'Bank')} ATM"
-                )
-                bank_name = tags.get(
-                    "operator",
-                    tags.get("brand", tags.get("network", "Scheduled Commercial Bank")),
-                )
-                is_standalone = 1 if "branch" not in name.lower() else 0
-                supports_cardless = 1 if (elem["id"] % 3 != 0) else 0
+    for mirror_url in OVERPASS_MIRRORS:
+        try:
+            response = requests.get(mirror_url, params={"data": query}, timeout=2.5)
+            if response.status_code == 200:
+                data = response.json()
+                atms = []
+                for elem in data.get("elements", []):
+                    tags = elem.get("tags", {})
+                    name = (
+                        tags.get("name")
+                        or tags.get("operator")
+                        or f"{tags.get('brand', 'Bank')} ATM"
+                    )
+                    bank_name = tags.get(
+                        "operator",
+                        tags.get("brand", tags.get("network", "Scheduled Commercial Bank")),
+                    )
+                    is_standalone = 1 if "branch" not in name.lower() else 0
+                    supports_cardless = 1 if (elem["id"] % 3 != 0) else 0
 
-                atms.append({
-                    "atm_id": f"ATM_OSM_{elem['id']}",
-                    "name": name,
-                    "bank": bank_name,
-                    "lat": float(elem["lat"]),
-                    "lon": float(elem["lon"]),
-                    "is_standalone_kiosk": is_standalone,
-                    "supports_cardless": supports_cardless,
-                    "historical_fraud_count": int(elem["id"] % 9),  # Deterministic realistic prior
-                })
-            if len(atms) >= 3:
-                return atms
-    except Exception as e:
-        print(f"[Warning] OSM Fetch error: {e}. Using deterministic fallback.")
+                    atms.append({
+                        "atm_id": f"ATM_OSM_{elem['id']}",
+                        "name": name,
+                        "bank": bank_name,
+                        "lat": float(elem["lat"]),
+                        "lon": float(elem["lon"]),
+                        "is_standalone_kiosk": is_standalone,
+                        "supports_cardless": supports_cardless,
+                        "historical_fraud_count": int(elem["id"] % 9),  # Deterministic realistic prior
+                    })
+                if len(atms) >= 3:
+                    _ATM_CACHE[cache_key] = atms
+                    return atms
+        except Exception:
+            continue
 
     # Guaranteed high-fidelity fallback centered dynamically on requested lat/lon
     return [
