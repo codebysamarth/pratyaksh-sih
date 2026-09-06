@@ -24,7 +24,7 @@ if BASE_DIR not in sys.path:
 
 from utils.geo_math import haversine_distance, estimate_travel_time
 from utils.pdf_generator import generate_section65b_pdf, compute_sha256
-from ml.osm_fetcher import fetch_real_atms_osm, DEFAULT_LAT, DEFAULT_LON
+from ml.osm_fetcher import fetch_real_atms_osm, geocode_city_or_location, DEFAULT_LAT, DEFAULT_LON
 from ml.graph_engine import MuleGraphEngine
 from ml.spatial_ranker import SpatialRanker
 
@@ -85,9 +85,18 @@ class SimulateFraudRequest(BaseModel):
     victim_name: str = Field(default="Ramesh Kulkarni")
     amount: float = Field(default=350000.0, description="Defrauded amount in INR")
     fraud_type: str = Field(default="DIGITAL_ARREST", description="Fraud category")
-    center_lat: float = Field(default=DEFAULT_LAT, description="Latitude for incident epicenter")
-    center_lon: float = Field(default=DEFAULT_LON, description="Longitude for incident epicenter")
-    location_name: str = Field(default="VIT Pune, Bibwewadi", description="Human readable area")
+    center_lat: Optional[float] = Field(default=None, description="Latitude for incident epicenter (optional, auto-geocoded from location_name)")
+    center_lon: Optional[float] = Field(default=None, description="Longitude for incident epicenter (optional, auto-geocoded from location_name)")
+    location_name: str = Field(default="VIT Pune, Bibwewadi", description="Human readable area or City (e.g., Kolhapur, Pune, Mumbai, Delhi)")
+
+
+class HelplineCallRequest(BaseModel):
+    caller_phone: str = Field(default="+91 98220 12345", description="Victim phone number calling 1930")
+    victim_name: str = Field(default="Suresh Patil", description="Name of complainant")
+    amount: float = Field(default=420000.0, description="Amount lost in INR")
+    fraud_type: str = Field(default="DIGITAL_ARREST", description="Category: DIGITAL_ARREST, APK_SCAM, INVESTMENT_SCAM")
+    city_or_location: str = Field(default="Kolhapur, Maharashtra", description="City / area where victim is situated")
+    suspect_upi_or_account: Optional[str] = Field(default="paytmqr2810@paytm", description="Mule account/UPI ID")
 
 
 class PredictHotspotsRequest(BaseModel):
@@ -123,19 +132,56 @@ def health_check():
     }
 
 
+@app.post("/api/1930-helpline/call")
+async def simulate_helpline_call(payload: HelplineCallRequest):
+    """
+    Simulates a citizen dialing 1930 National Cyber Helpline (IVR Triage).
+    Verifies phone, geocodes the location (e.g. Kolhapur), isolates mule, and triggers live AI prediction.
+    """
+    # 1. Geocode city / area
+    geo = geocode_city_or_location(payload.city_or_location)
+    
+    # 2. Forward to simulate fraud engine
+    fraud_req = SimulateFraudRequest(
+        victim_name=payload.victim_name,
+        amount=payload.amount,
+        fraud_type=payload.fraud_type,
+        center_lat=geo["lat"],
+        center_lon=geo["lon"],
+        location_name=geo["display"],
+    )
+    result = await simulate_fraud(fraud_req)
+    result["helpline_call"] = {
+        "caller_phone": payload.caller_phone,
+        "call_status": "IVR_VERIFIED_CONNECTED",
+        "sla_dispatch": "NATIONAL_THREAT_MAP_SYNCED",
+    }
+    return result
+
+
 @app.post("/api/simulate-fraud")
 async def simulate_fraud(payload: SimulateFraudRequest):
     """
     Simulates a live 1930 Cybercrime incident:
-    1. Traces multi-hop money flow & fan-out smurfing.
-    2. Dynamically pulls real candidate ATMs via OSM.
-    3. Runs 2-stage spatial ranker with SHAP feature explainability.
-    4. Computes SHA-256 evidence hashes & Merkle root proof.
-    5. Broadcasts event over WebSocket `/ws/threat-stream`.
+    1. Geocodes location (Kolhapur, Pune, Mumbai, Delhi, or custom coords).
+    2. Traces multi-hop money flow & fan-out smurfing.
+    3. Dynamically pulls real candidate ATMs via OSM.
+    4. Runs 2-stage spatial ranker with SHAP feature explainability.
+    5. Computes SHA-256 evidence hashes & Merkle root proof.
+    6. Broadcasts event over WebSocket `/ws/threat-stream`.
     """
     case_num = len(CASE_CACHE) + 1
     case_id = f"NCRP-2024-PUN{1000 + case_num}"
     now = datetime.now()
+
+    # Dynamic Geocode Resolution if lat/lon not explicitly set or default
+    eff_lat = payload.center_lat
+    eff_lon = payload.center_lon
+    if eff_lat is None or eff_lon is None:
+        geo = geocode_city_or_location(payload.location_name)
+        eff_lat = geo["lat"]
+        eff_lon = geo["lon"]
+        payload.location_name = geo["display"]
 
     # 1. Multi-hop Mule Trail Generation
     trail = graph_engine.generate_mule_trail(
@@ -143,8 +189,8 @@ async def simulate_fraud(payload: SimulateFraudRequest):
         victim_name=payload.victim_name,
         amount=payload.amount,
         fraud_type=payload.fraud_type,
-        center_lat=payload.center_lat,
-        center_lon=payload.center_lon,
+        center_lat=eff_lat,
+        center_lon=eff_lon,
         start_time=now,
     )
 
@@ -152,7 +198,7 @@ async def simulate_fraud(payload: SimulateFraudRequest):
     mule_lon = trail["primary_mule_lon"]
 
     # 2. Dynamic Real ATM Retrieval
-    raw_atms = fetch_real_atms_osm(lat=mule_lat, lon=mule_lon, radius=2800)
+    raw_atms = fetch_real_atms_osm(lat=mule_lat, lon=mule_lon, radius=2800, area_name=payload.location_name)
 
     # 3. XGBoost Geospatial Inference & Softmax Calibration
     ranked_atms = spatial_ranker.rank_candidate_atms(
