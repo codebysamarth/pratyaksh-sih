@@ -117,6 +117,8 @@ def fetch_real_atms_osm(lat: float = DEFAULT_LAT, lon: float = DEFAULT_LON, radi
 
     # Guaranteed dynamic high-fidelity fallback centered relative to given lat/lon
     loc_tag = area_name.split(",")[0] if area_name else "City Center"
+    if "Device" in loc_tag or "GPS" in loc_tag:
+        loc_tag = "Sector Hub"
     return [
         {
             "atm_id": f"ATM_{abs(int(lat*1000))}_01",

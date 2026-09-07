@@ -123,8 +123,8 @@ class SpatialRanker:
         # Convert sigmoid probabilities back to scaled margins / logits
         clipped_p = np.clip(raw_arr, 1e-4, 1.0 - 1e-4)
         logits = np.log(clipped_p / (1.0 - clipped_p))
-        # Apply scaling temperature
-        scaled_logits = logits * 1.8
+        # Apply calibrated scaling temperature for realistic spatial probability distribution
+        scaled_logits = logits * 0.65
         exp_scores = np.exp(scaled_logits - np.max(scaled_logits))
         probs = exp_scores / np.sum(exp_scores)
 

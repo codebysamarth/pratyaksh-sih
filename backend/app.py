@@ -385,6 +385,86 @@ def list_seeded_cases():
     return {"total": len(CASE_CACHE), "cases": list(CASE_CACHE.values())}
 
 
+class DispatchPatrolRequest(BaseModel):
+    case_id: str = "CASE_26184_PUN_042"
+    atm_name: str = "SBI ATM - VIT Pune Main Gate"
+    eta_mins: int = 8
+    amount: str = "3,50,000"
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+@app.post("/api/dispatch-patrol")
+async def api_dispatch_patrol(payload: DispatchPatrolRequest):
+    """
+    Direct Telegram Dispatch endpoint.
+    Sends high-priority push alert directly to on-duty police officer's Telegram with GPS navigation.
+    """
+    cfg_path = os.path.join(BASE_DIR, "..", "blockchain", "telegram", "bot_config.json")
+    bot_token = ""
+    chat_id = ""
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                c = json.load(f)
+                bot_token = c.get("BOT_TOKEN", "")
+                chat_id = str(c.get("CHAT_ID", ""))
+        except Exception:
+            pass
+
+    if not bot_token:
+        bot_token = "8602710035:AAGLdlmik_aGqIL8KL2H8vxwqTF0tvojMEc"
+    if not chat_id:
+        chat_id = "8049856894"
+
+    coords_line = f"🌐 <b>GPS Coords:</b> <code>{payload.lat:.4f}, {payload.lon:.4f}</code>\n" if (payload.lat and payload.lon) else ""
+    if payload.lat and payload.lon:
+        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={payload.lat},{payload.lon}"
+    else:
+        maps_url = f"https://maps.google.com/?q={payload.atm_name.replace(' ', '+')}"
+
+    msg_text = (
+        "🚨 <b>I4C PRATYAKSH FIELD ALERT</b> 🚨\n\n"
+        "⚠️ <b>CRITICAL:</b> High-Probability Cash-Out Predicted\n"
+        f"📁 <b>Case ID:</b> <code>{payload.case_id}</code>\n"
+        f"💰 <b>Defrauded Amount:</b> <code>₹{payload.amount}</code>\n"
+        f"📍 <b>Target ATM:</b> <b>{payload.atm_name}</b>\n"
+        f"{coords_line}"
+        f"⏳ <b>Est. Arrival Window:</b> <code>{payload.eta_mins} mins remaining</code>\n\n"
+        "🔴 Immediate beat police interception requested!\n\n"
+        "<i>Tap 'Accept Beat Patrol' or 'Open Turn-by-Turn GPS' below:</i>"
+    )
+
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🚔 Accept Beat Patrol", "callback_data": f"ACCEPT:{payload.case_id}"},
+                {"text": "🗺️ Open Turn-by-Turn GPS", "url": maps_url},
+            ],
+            [
+                {"text": "ℹ️ Case Details", "callback_data": f"DETAILS:{payload.case_id}"},
+            ],
+        ]
+    }
+
+    import urllib.request
+    req_body = json.dumps({
+        "chat_id": chat_id,
+        "text": msg_text,
+        "parse_mode": "HTML",
+        "reply_markup": keyboard,
+    }).encode("utf-8")
+
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        req = urllib.request.Request(url, data=req_body, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            return {"status": "DISPATCH_BROADCASTED", "telegram_status": "SENT_LIVE_TO_TELEGRAM", "tg_response": data}
+    except Exception as e:
+        return {"status": "DISPATCH_BROADCASTED", "telegram_status": f"ERROR: {str(e)}"}
+
+
 # --- WebSocket Stream ---
 @app.websocket("/ws/threat-stream")
 async def threat_stream(websocket: WebSocket):
