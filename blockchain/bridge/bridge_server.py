@@ -175,6 +175,14 @@ class VerifyCardPayload(BaseModel):
     card_number: str = Field(..., example="4111111111111111")
     atm_id:      str = Field(..., example="ATM_SBI_VITP_01")
 
+class DispatchPatrolPayload(BaseModel):
+    case_id:   str = Field(..., example="CASE_26184_001")
+    atm_name:  str = Field(..., example="SBI ATM - VIT Pune Main Gate")
+    eta_mins:  int = Field(8, example=8)
+    amount:    str = Field("3,50,000", example="3,50,000")
+    lat:       Optional[float] = Field(None, example=18.4636)
+    lon:       Optional[float] = Field(None, example=73.8682)
+
 class ReverseLienPayload(BaseModel):
     mule_account: str = Field(..., example="9876543210_HDFC")
 
@@ -334,6 +342,84 @@ async def ack_dispatch(payload: AckDispatchPayload):
         "block_number": receipt.blockNumber,
     }
     await manager.broadcast({"event": "POLICE_DISPATCHED", **result})
+    return result
+
+
+@app.post("/chain/dispatch-patrol", tags=["Telegram Dispatch"])
+async def dispatch_patrol(payload: DispatchPatrolPayload):
+    """
+    **Frontend Interdiction Center Integration Point.**
+    Called when an officer clicks 'Dispatch Beat Police Patrol'.
+    Sends high-priority Telegram push notification to the on-duty PCR unit with turn-by-turn navigation!
+    """
+    cfg_file = Path(__file__).parent.parent / "telegram" / "bot_config.json"
+    bot_token = ""
+    chat_id = ""
+    if cfg_file.exists():
+        try:
+            with cfg_file.open() as f:
+                c = json.load(f)
+                bot_token = c.get("BOT_TOKEN", "")
+                chat_id = c.get("CHAT_ID", "")
+        except Exception as e:
+            log.warning("Could not read bot_config.json: %s", e)
+
+    tg_status = "NOT_CONFIGURED"
+    if bot_token and chat_id and bot_token != "YOUR_TELEGRAM_BOT_TOKEN":
+        coords_str = f"🌐 <b>GPS Coords:</b> <code>{payload.lat:.4f}, {payload.lon:.4f}</code>\n" if (payload.lat and payload.lon) else ""
+        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={payload.lat},{payload.lon}" if (payload.lat and payload.lon) else f"https://maps.google.com/?q={payload.atm_name.replace(' ', '+')}"
+
+        msg = (
+            "🚨 <b>I4C PRATYAKSH FIELD ALERT</b> 🚨\n\n"
+            "⚠️ <b>CRITICAL:</b> High-Probability Cash-Out Predicted\n"
+            f"📁 <b>Case ID:</b> <code>{payload.case_id}</code>\n"
+            f"💰 <b>Defrauded Amount:</b> <code>₹{payload.amount}</code>\n"
+            f"📍 <b>Target ATM:</b> <b>{payload.atm_name}</b>\n"
+            f"{coords_str}"
+            f"⏳ <b>Est. Arrival Window:</b> <code>{payload.eta_mins} mins remaining</code>\n\n"
+            "🔴 Immediate beat police interception requested!\n\n"
+            "<i>Tap 'Accept Beat Patrol' to log SLA on-chain, or 'Open GPS Map' for live turn-by-turn navigation.</i>"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚔 Accept Beat Patrol", "callback_data": f"ACCEPT:{payload.case_id}"},
+                    {"text": "🗺️ Open Turn-by-Turn GPS", "url": maps_url},
+                ],
+                [
+                    {"text": "ℹ️ Case Details", "callback_data": f"DETAILS:{payload.case_id}"},
+                ],
+            ]
+        }
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": msg,
+                        "parse_mode": "HTML",
+                        "reply_markup": keyboard,
+                    },
+                )
+                if r.status_code == 200:
+                    tg_status = "SENT_LIVE_TO_TELEGRAM"
+                    log.info("Patrol alert dispatched live to Telegram chat %s", chat_id)
+                else:
+                    tg_status = f"TELEGRAM_ERROR_{r.status_code}"
+        except Exception as exc:
+            log.warning("Telegram dispatch error: %s", exc)
+            tg_status = f"ERROR: {exc}"
+
+    result = {
+        "status": "DISPATCH_BROADCASTED",
+        "case_id": payload.case_id,
+        "atm_name": payload.atm_name,
+        "telegram_status": tg_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    await manager.broadcast({"event": "PATROL_DISPATCHED", **result})
     return result
 
 

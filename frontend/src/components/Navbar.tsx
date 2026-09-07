@@ -44,15 +44,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   const navItems = [
-    { id: "command" as const, label: "Command Center", icon: Radio, sub: "GIS & Hotspots" },
-    { id: "deepdive" as const, label: "Case Deep-Dive", icon: Network, sub: "Smurfing & SHAP" },
-    { id: "atm" as const, label: "ATM Simulator", icon: Terminal, sub: "Judge Playground" },
-    { id: "ledger" as const, label: "Consortium Ledger", icon: Boxes, sub: "SLA & Audit" },
+    { id: "command" as const, label: "Command Center", icon: Radio, sub: "Live Map & Suspect Tracking" },
+    { id: "deepdive" as const, label: "Case Deep-Dive", icon: Network, sub: "Money Trail & AI Reasoning" },
+    { id: "atm" as const, label: "Cashout Defense", icon: Terminal, sub: "Omni-Channel Simulator" },
+    { id: "ledger" as const, label: "Audit Ledger", icon: Boxes, sub: "Inter-Bank Freeze Network" },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/90 px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-      <div className="max-w-[1720px] mx-auto flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="max-w-[1720px] mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
         {/* Brand & Authority Identity */}
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center w-9 h-9 rounded-md bg-slate-900 text-white shadow-sm">
@@ -97,6 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Icon className={clsx("w-3.5 h-3.5", isActive ? "text-blue-600" : "text-slate-500")} />
                 <div className="text-left">
                   <div className="leading-tight">{item.label}</div>
+                  <div className="text-[9px] text-slate-500 font-normal">{item.sub}</div>
                 </div>
               </button>
             );
@@ -118,13 +119,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
-          {/* Mesh Status */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-mono font-medium">
+          {/* Inter-Bank Network Status */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-mono font-medium">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-600" />
             </span>
-            <span>CONSORTIUM MESH: ACTIVE</span>
+            <span>INTER-BANK GRID: 5 BANKS LINKED</span>
           </div>
 
           {/* System Clock */}

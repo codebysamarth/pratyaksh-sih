@@ -107,6 +107,8 @@ async def send_patrol_alert(
     eta_mins:  int,
     amount:    str,
     chat_id:   str | None = None,
+    lat:       float | None = None,
+    lon:       float | None = None,
 ) -> dict:
     """
     Sends an audible high-priority push alert to the field officer's Telegram.
@@ -118,6 +120,8 @@ async def send_patrol_alert(
         eta_mins:  Estimated minutes until predicted cash-out
         amount:    Defrauded amount string (e.g. "3,50,000")
         chat_id:   Override chat_id (defaults to bot_config.json CHAT_ID)
+        lat:       Latitude of target ATM
+        lon:       Longitude of target ATM
 
     Returns:
         Telegram API response dict.
@@ -127,24 +131,30 @@ async def send_patrol_alert(
         log.error("BOT_TOKEN or CHAT_ID missing — cannot send alert.")
         return {"error": "BOT_TOKEN or CHAT_ID not configured"}
 
+    coords_line = f"🌐 <b>GPS Coords:</b> <code>{lat:.4f}, {lon:.4f}</code>\n" if (lat and lon) else ""
+
     message_text = (
         "🚨 <b>I4C PRATYAKSH FIELD ALERT</b> 🚨\n\n"
         "⚠️ <b>CRITICAL:</b> High-Probability Cash-Out Predicted\n"
         f"📁 <b>Case ID:</b> <code>{case_id}</code>\n"
         f"💰 <b>Defrauded Amount:</b> <code>₹{amount}</code>\n"
         f"📍 <b>Target ATM:</b> <b>{atm_name}</b>\n"
+        f"{coords_line}"
         f"⏳ <b>Est. Arrival Window:</b> <code>{eta_mins} mins remaining</code>\n\n"
         "🔴 Immediate beat police interception requested!\n\n"
-        "<i>Tap the button below to acknowledge patrol assignment.</i>"
+        "<i>Tap 'Accept Beat Patrol' to log SLA on-chain, or 'Open GPS Map' for live turn-by-turn navigation.</i>"
     )
 
-    # Build Google Maps URL using ATM name as query (geocoded on the fly)
-    maps_url = f"https://maps.google.com/?q={atm_name.replace(' ', '+')}"
+    # Direct Google Maps navigation URL
+    if lat and lon:
+        maps_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+    else:
+        maps_url = f"https://maps.google.com/?q={atm_name.replace(' ', '+')}"
 
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🚔 Accept Beat Patrol", callback_data=f"ACCEPT:{case_id}"),
-            InlineKeyboardButton("🗺️ Open GPS Map",       url=maps_url),
+            InlineKeyboardButton("🗺️ Open Turn-by-Turn GPS", url=maps_url),
         ],
         [
             InlineKeyboardButton("ℹ️ Case Details",       callback_data=f"DETAILS:{case_id}"),
